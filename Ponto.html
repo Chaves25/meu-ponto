@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Controle de Ponto - Mensal</title>
+<!-- Ícone embutido (base64) -->
+<link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAABZklEQVRYR+2XvUrDQBCGv7Q6KIrciA6gtugS1W0tBz+AfJ8AhP0G2gYrYCiGxyH9kF+0myZIwZ7STL7ZBnvP5uf9Rbg6jDEiTkqBLK0B7E+ALgAXAPe1QeR9BfTSk/IZOw9EDc6AC8AfgcOoTZ0CA0nK0X6WrCK5bAFAhTwADb4AnwBnYAi2d66wCcAhaKJ6yE4AOMNNJPoFwhAW8kCq2G8e8jlgH8sU+9G1rj9VjR+gBW3zglgIc+Y0aHzqU4OeAq8BC8AAsDiHqVPhF7qZsA4LwC/0Z+X7Z2BGelipz1R7GykHP7+HnYVv0RkmrH63kRBr3dr7nADsKqpi8xwN4TYP3kik1cF9VvKEMlZpNfQHVvqny3ky4FurWQ7nJXfxl7RZ9X6B1eT7t0e0JAAAAAElFTkSuQmCC">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  body { font-family: Arial; max-width: 750px; margin: auto; padding: 20px; }
+  button { padding: 10px 20px; margin: 5px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+  th, td { border: 1px solid #ccc; padding: 5px; text-align: center; }
+  th { background-color: #f4f4f4; }
+  .extra { color: green; font-weight: bold; }
+  .falta { color: red; font-weight: bold; }
+  h2,h3 { margin-bottom: 5px; }
+  #grafico { margin-top: 30px; }
+</style>
+</head>
+<body>
+
+<h2>Controle de Ponto - Mensal</h2>
+<button onclick="baterEntrada()">Bater Entrada</button>
+<button onclick="baterSaida()">Bater Saída</button>
+<button onclick="limparMes()">Limpar Mês</button>
+
+<p id="status"></p>
+
+<table id="historico">
+  <tr>
+    <th>Data</th>
+    <th>Entrada</th>
+    <th>Saída</th>
+    <th>Intervalo</th>
+    <th>Horas Trabalhadas</th>
+    <th>Horas Esperadas</th>
+    <th>Diferença</th>
+    <th>Banco Acumulado</th>
+  </tr>
+</table>
+
+<h3>Resumo do Mês</h3>
+<p>Total Trabalhado: <span id="totalTrab">0</span>h | Total Esperado: <span id="totalEsp">0</span>h | Banco de Horas: <span id="bancoHoras">0</span>h</p>
+
+<canvas id="grafico" height="200"></canvas>
+
+<script>
+const mesAtual = new Date().getMonth() + 1;
+const chaveLocalStorage = `historico_mes_${mesAtual}`;
+let pontoHoje = {entrada:null,saida:null,intervalo:1};
+let historico = JSON.parse(localStorage.getItem(chaveLocalStorage)) || [];
+
+function horaDecimal(horaStr) {
+  const [h,m] = horaStr.split(':').map(Number);
+  return h + m/60;
+}
+
+function atualizarTabela() {
+  const tabela = document.getElementById('historico');
+  tabela.innerHTML = `
+    <tr>
+      <th>Data</th>
+      <th>Entrada</th>
+      <th>Saída</th>
+      <th>Intervalo</th>
+      <th>Horas Trabalhadas</th>
+      <th>Horas Esperadas</th>
+      <th>Diferença</th>
+      <th>Banco Acumulado</th>
+    </tr>
+  `;
+  let banco = 0;
+  let totalTrab = 0;
+  let totalEsp = 0;
+  historico.forEach(item => {
+    const diff = item.trabalhadas - item.esperadas;
+    banco += diff;
+    totalTrab += item.trabalhadas;
+    totalEsp += item.esperadas;
+    tabela.innerHTML += `
+      <tr>
+        <td>${item.data}</td>
+        <td>${item.entrada}</td>
+        <td>${item.saida}</td>
+        <td>${item.intervalo}:00</td>
+        <td>${item.trabalhadas.toFixed(2)}</td>
+        <td>${item.esperadas.toFixed(2)}</td>
+        <td class="${diff>0?'extra':diff<0?'falta':''}">${diff.toFixed(2)}</td>
+        <td>${banco.toFixed(2)}</td>
+      </tr>
+    `;
+  });
+  document.getElementById('totalTrab').innerText = totalTrab.toFixed(2);
+  document.getElementById('totalEsp').innerText = totalEsp.toFixed(2);
+  document.getElementById('bancoHoras').innerText = banco.toFixed(2);
+  atualizarGrafico(historico);
+}
+
+function baterEntrada() {
+  const agora = new Date();
+  pontoHoje.entrada = agora.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  pontoHoje.data = agora.toLocaleDateString('pt-BR');
+  document.getElementById('status').innerText = `Entrada registrada: ${pontoHoje.entrada}`;
+}
+
+function baterSaida() {
+  if(!pontoHoje.entrada){alert('Registre a entrada primeiro!');return;}
+  const agora = new Date();
+  pontoHoje.saida = agora.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  let hrsTrab = horaDecimal(pontoHoje.saida) - horaDecimal(pontoHoje.entrada) - pontoHoje.intervalo;
+  const diaSemana = new Date().getDay();
+  const hrsEsperadas = (diaSemana===5)?8:9;
+  historico.push({data:pontoHoje.data,entrada:pontoHoje.entrada,saida:pontoHoje.saida,intervalo:pontoHoje.intervalo,trabalhadas:hrsTrab,esperadas:hrsEsperadas});
+  localStorage.setItem(chaveLocalStorage,JSON.stringify(historico));
+  pontoHoje = {entrada:null,saida:null,intervalo:1};
+  document.getElementById('status').innerText = 'Saída registrada!';
+  atualizarTabela();
+}
+
+function limparMes() {
+  if(confirm('Tem certeza que deseja limpar este mês?')) {
+    historico = [];
+    localStorage.removeItem(chaveLocalStorage);
+    atualizarTabela();
+    document.getElementById('status').innerText = 'Mês limpo!';
+  }
+}
+
+function atualizarGrafico(dados){
+  const ctx = document.getElementById('grafico').getContext('2d');
+  const labels = dados.map(d=>d.data);
+  const extras = dados.map(d=>d.trabalhadas - d.esperadas);
+  if(window.graficoInstancia) window.graficoInstancia.destroy();
+  window.graficoInstancia = new Chart(ctx,{type:'bar',data:{labels:labels,datasets:[{label:'Diferença de Horas (+/-)',data:extras,backgroundColor:extras.map(v=>v>=0?'green':'red')}]} ,options:{responsive:true,scales:{y:{beginAtZero:true}}}});
+}
+
+atualizarTabela();
+</script>
+</body>
+</html>
