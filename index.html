@@ -1,140 +1,58 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Meu Ponto</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
-body {
-  font-family: 'Segoe UI', Arial;
-  background: #f4f6f9;
-  margin: 0;
-  padding: 15px;
-}
-
-.container {
-  max-width: 900px;
-  margin: auto;
-}
-
-h2 {
-  text-align: center;
-  color: #333;
-}
-
-.buttons {
-  text-align: center;
-  margin-bottom: 10px;
-}
-
-button {
-  background: #0d6efd;
-  color: white;
-  border: none;
-  padding: 12px 16px;
-  margin: 5px;
-  border-radius: 10px;
-  cursor: pointer;
-  font-size: 14px;
-  transition: 0.2s;
-}
-
-button:hover {
-  background: #0b5ed7;
-}
-
-.btn-danger {
-  background: #dc3545;
-}
-
-.btn-danger:hover {
-  background: #bb2d3b;
-}
-
-.card {
-  background: white;
-  padding: 15px;
-  margin-top: 15px;
-  border-radius: 12px;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-}
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 14px;
-}
-
-th {
-  background: #0d6efd;
-  color: white;
-  padding: 8px;
-}
-
-td {
-  padding: 8px;
-  border-bottom: 1px solid #ddd;
-}
-
-tr:hover {
-  background: #f1f1f1;
-}
-
-.extra {
-  color: green;
-  font-weight: bold;
-}
-
-.falta {
-  color: red;
-  font-weight: bold;
-}
-
-.resumo {
-  text-align: center;
-  font-size: 16px;
-  font-weight: bold;
-}
-
-#status {
-  text-align: center;
-  font-weight: bold;
-  margin-top: 10px;
-}
-
-@media(max-width:600px){
-  table { font-size: 12px; }
-  button { width: 100%; }
-}
+body { font-family: 'Segoe UI', Arial; background: #f4f6f9; margin:0; padding:15px; transition: background 0.3s, color 0.3s; }
+.dark { background: #121212; color:#eee; }
+.dark .card { background:#1e1e1e; }
+.dark table { color:#eee; }
+.dark th { background:#333; }
+.dark td { border-color:#444; }
+.container { max-width:900px; margin:auto; }
+h2 { text-align:center; color:inherit; }
+.buttons { text-align:center; margin-bottom:10px; }
+button { background:#0d6efd; color:white; border:none; padding:12px 16px; margin:5px 6px; border-radius:10px; cursor:pointer; font-size:14px; transition: background 0.2s; }
+button:hover { background:#0b5ed7; }
+.btn-danger { background:#dc3545; }
+.btn-danger:hover { background:#bb2d3b; }
+.card { background:white; padding:15px; margin-top:15px; border-radius:12px; box-shadow:0 2px 10px rgba(0,0,0,0.1); }
+table { width:100%; border-collapse:collapse; font-size:14px; }
+th { background:#0d6efd; color:white; padding:8px; }
+td { padding:8px; border-bottom:1px solid #ddd; }
+tr:hover { background:#f1f1f1; }
+.extra { color:green; font-weight:bold; }
+.falta { color:red; font-weight:bold; }
+.resumo { text-align:center; font-size:16px; font-weight:bold; }
+#status { text-align:center; font-weight:bold; margin-top:10px; min-height:1.2em; }
+@media(max-width:600px){ table{ font-size:12px; } button{ width:100%; margin:5px 0; } }
 </style>
 </head>
-
 <body>
 
 <div class="container">
-
-<h2>📊 Meu Controle de Ponto</h2>
+<h2>📊 Meu Controle de Ponto - <span id="nomeUsuario"></span></h2>
 
 <div class="buttons">
   <button onclick="baterEntrada()">🟢 Entrada</button>
   <button onclick="baterSaida()">🔴 Saída</button>
   <button class="btn-danger" onclick="limparMes()">🗑️ Limpar</button>
+  <button onclick="toggleDark()">🌙 Modo</button>
+  <button onclick="exportar()">📊 Exportar</button>
+  <button onclick="logout()">🔑 Sair</button>
 </div>
 
 <p id="status"></p>
 
 <div class="card">
 <table id="historico">
-<tr>
-<th>Data</th>
-<th>Entrada</th>
-<th>Saída</th>
-<th>Horas</th>
-<th>Meta</th>
-<th>Saldo</th>
-<th>Banco</th>
-</tr>
+  <tr>
+    <th>Data</th><th>Entrada</th><th>Saída</th><th>Horas</th><th>Meta</th><th>Saldo</th><th>Banco</th>
+  </tr>
 </table>
 </div>
 
@@ -147,117 +65,105 @@ Saldo: <span id="bancoHoras">0</span>h
 </div>
 
 <canvas id="grafico"></canvas>
-
 </div>
 
 <script>
+// ===== USUÁRIOS =====
+const usuarios = { "Chaves":"1234", "Vitor":"4321" };
+
+// ===== LOGIN =====
+function login(){
+  let user = prompt("Usuário:");
+  let pass = prompt("Senha:");
+  if(usuarios[user] && usuarios[user] === pass){
+    localStorage.setItem("usuarioLogado", user);
+    return user;
+  } else {
+    alert("Usuário ou senha inválidos");
+    return login();
+  }
+}
+
+let usuarioLogado = localStorage.getItem("usuarioLogado") || login();
+document.getElementById("nomeUsuario").innerText = usuarioLogado;
+
+// ===== VARIÁVEIS =====
 const mesAtual = new Date().getMonth()+1;
-const chave = "ponto_mes_"+mesAtual;
+const chave = "ponto_mes_"+mesAtual+"_"+usuarioLogado;
 
 let pontoHoje = {entrada:null,saida:null,intervalo:1};
 let historico = JSON.parse(localStorage.getItem(chave))||[];
 
-function horaDecimal(h){
-  let [h1,m]=h.split(':').map(Number);
-  return h1 + m/60;
-}
+// ===== FUNÇÕES =====
+function horaDecimal(h){ let [h1,m]=h.split(':').map(Number); return h1+m/60; }
 
 function atualizar(){
   let tabela = document.getElementById("historico");
-  tabela.innerHTML = `
-<tr>
-<th>Data</th><th>Entrada</th><th>Saída</th>
-<th>Horas</th><th>Meta</th><th>Saldo</th><th>Banco</th>
-</tr>`;
-
+  tabela.innerHTML = `<tr><th>Data</th><th>Entrada</th><th>Saída</th><th>Horas</th><th>Meta</th><th>Saldo</th><th>Banco</th></tr>`;
   let banco=0,totalT=0,totalE=0;
-
   historico.forEach(i=>{
     let diff=i.trabalhadas-i.esperadas;
-    banco+=diff;
-    totalT+=i.trabalhadas;
-    totalE+=i.esperadas;
-
-    tabela.innerHTML+=`
-<tr>
-<td>${i.data}</td>
-<td>${i.entrada}</td>
-<td>${i.saida}</td>
-<td>${i.trabalhadas.toFixed(2)}</td>
-<td>${i.esperadas}</td>
-<td class="${diff>0?'extra':'falta'}">${diff.toFixed(2)}</td>
-<td>${banco.toFixed(2)}</td>
-</tr>`;
+    banco+=diff; totalT+=i.trabalhadas; totalE+=i.esperadas;
+    tabela.innerHTML+=`<tr><td>${i.data}</td><td>${i.entrada}</td><td>${i.saida}</td><td>${i.trabalhadas.toFixed(2)}</td><td>${i.esperadas}</td><td class="${diff>=0?'extra':'falta'}">${diff.toFixed(2)}</td><td>${banco.toFixed(2)}</td></tr>`;
   });
-
-  document.getElementById("totalTrab").innerText=totalT.toFixed(2);
-  document.getElementById("totalEsp").innerText=totalE.toFixed(2);
-  document.getElementById("bancoHoras").innerText=banco.toFixed(2);
-
+  document.getElementById("totalTrab").innerText = totalT.toFixed(2);
+  document.getElementById("totalEsp").innerText = totalE.toFixed(2);
+  document.getElementById("bancoHoras").innerText = banco.toFixed(2);
   grafico(historico);
 }
 
 function baterEntrada(){
-  let agora=new Date();
-  pontoHoje.entrada=agora.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
-  pontoHoje.data=agora.toLocaleDateString('pt-BR');
+  let agora = new Date();
+  pontoHoje.entrada = agora.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  pontoHoje.data = agora.toLocaleDateString('pt-BR');
   status("Entrada: "+pontoHoje.entrada);
 }
 
 function baterSaida(){
-  if(!pontoHoje.entrada){alert("Registre entrada");return;}
-
-  let agora=new Date();
-  pontoHoje.saida=agora.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
-
-  let trab=horaDecimal(pontoHoje.saida)-horaDecimal(pontoHoje.entrada)-1;
-  let sexta=new Date().getDay()==5;
-  let meta=sexta?8:9;
-
-  historico.push({
-    data:pontoHoje.data,
-    entrada:pontoHoje.entrada,
-    saida:pontoHoje.saida,
-    trabalhadas:trab,
-    esperadas:meta
-  });
-
+  if(!pontoHoje.entrada){ alert("Registre entrada primeiro!"); return; }
+  let agora = new Date();
+  pontoHoje.saida = agora.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  let trab = horaDecimal(pontoHoje.saida)-horaDecimal(pontoHoje.entrada)-1;
+  let sexta = new Date().getDay()==5;
+  let meta = sexta?8:9;
+  historico.push({data:pontoHoje.data,entrada:pontoHoje.entrada,saida:pontoHoje.saida,trabalhadas:trab,esperadas:meta});
   localStorage.setItem(chave,JSON.stringify(historico));
   pontoHoje={};
   status("Saída registrada!");
   atualizar();
 }
 
-function limparMes(){
-  if(confirm("Limpar mês?")){
-    historico=[];
-    localStorage.removeItem(chave);
-    atualizar();
-  }
-}
+function limparMes(){ if(confirm("Tem certeza que deseja limpar o mês?")){ historico=[]; localStorage.removeItem(chave); atualizar(); status("Mês limpo!"); } }
 
-function status(msg){
-  document.getElementById("status").innerText=msg;
-}
+function status(msg){ document.getElementById("status").innerText = msg; }
 
-function grafico(d){
+function grafico(dados){
   let ctx=document.getElementById("grafico").getContext("2d");
-  let labels=d.map(x=>x.data);
-  let valores=d.map(x=>x.trabalhadas-x.esperadas);
-
+  let labels=dados.map(x=>x.data);
+  let valores=dados.map(x=>x.trabalhadas - x.esperadas);
   if(window.graf) window.graf.destroy();
+  window.graf=new Chart(ctx,{type:'bar',data:{labels:labels,datasets:[{label:'Saldo de Horas',data:valores,backgroundColor:valores.map(v=>v>=0?'green':'red')}]},options:{scales:{y:{beginAtZero:true}}}});
+}
 
-  window.graf=new Chart(ctx,{
-    type:'bar',
-    data:{
-      labels:labels,
-      datasets:[{
-        label:'Saldo de Horas',
-        data:valores,
-        backgroundColor:valores.map(v=>v>=0?'green':'red')
-      }]
-    }
-  });
+// ===== DARK MODE =====
+function toggleDark(){ document.body.classList.toggle("dark"); localStorage.setItem("darkMode",document.body.classList.contains("dark")); }
+if(localStorage.getItem("darkMode")==="true"){ document.body.classList.add("dark"); }
+
+// ===== EXPORTAR CSV =====
+function exportar(){
+  let csv = "Data,Entrada,Saída,Horas,Meta,Saldo\n";
+  historico.forEach(i=>{ let diff=(i.trabalhadas-i.esperadas).toFixed(2); csv+=`${i.data},${i.entrada},${i.saida},${i.trabalhadas.toFixed(2)},${i.esperadas},${diff}\n`; });
+  let blob = new Blob([csv],{type:'text/csv'});
+  let link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = "ponto_"+usuarioLogado+".csv";
+  link.click();
+}
+
+// ===== LOGOUT FUNCIONAL =====
+function logout(){
+  localStorage.removeItem("usuarioLogado");
+  location.reload(); // força login novamente
 }
 
 atualizar();
