@@ -21,11 +21,14 @@ button {
   border-radius:10px; cursor:pointer;
 }
 
+button:active { transform:scale(0.95); }
+
 .btn-danger { background:#dc3545; }
 
 .card {
   background:white; padding:15px;
   margin-top:10px; border-radius:12px;
+  box-shadow:0 2px 10px rgba(0,0,0,0.1);
 }
 
 table { width:100%; border-collapse:collapse; }
@@ -58,19 +61,17 @@ input, select {
 
 <body>
 
-<!-- TELA LOGIN -->
+<!-- LOGIN -->
 <div id="loginTela" class="login">
   <div class="login-box">
 
     <h2>🔐 Meu Ponto</h2>
 
-    <!-- MENU -->
     <div id="menuInicial">
       <button onclick="mostrarLogin()">Entrar</button>
       <button onclick="mostrarCadastro()">Cadastrar</button>
     </div>
 
-    <!-- LOGIN -->
     <div id="areaLogin" style="display:none;">
       <select id="user"></select>
       <input id="pass" type="password" placeholder="Senha">
@@ -79,7 +80,6 @@ input, select {
       <p id="erroLogin" style="color:red;"></p>
     </div>
 
-    <!-- CADASTRO -->
     <div id="areaCadastro" style="display:none;">
       <input id="novoUser" placeholder="Novo usuário">
       <input id="novaSenha" type="password" placeholder="Senha">
@@ -121,6 +121,9 @@ Saldo: <span id="bancoHoras"></span>
 
 // ===== USUÁRIOS =====
 let usuarios = JSON.parse(localStorage.getItem("usuarios")) || {};
+
+// ===== TEMP =====
+let pontoHoje = JSON.parse(localStorage.getItem("pontoTemp")) || {};
 
 // ===== MENU =====
 function mostrarLogin(){
@@ -164,7 +167,7 @@ function entrar(){
   }
 }
 
-// ===== CADASTRAR =====
+// ===== CADASTRO =====
 function criarUsuario(){
   let user = document.getElementById("novoUser").value;
   let pass = document.getElementById("novaSenha").value;
@@ -209,7 +212,6 @@ window.onload = function(){
 
 // ===== PONTO =====
 const mesAtual = new Date().getMonth()+1;
-let pontoHoje = {};
 
 function getChave(){
   return "ponto_"+mesAtual+"_"+localStorage.getItem("usuarioLogado");
@@ -223,11 +225,13 @@ function salvar(hist){
   localStorage.setItem(getChave(), JSON.stringify(hist));
 }
 
+// ===== HORA =====
 function horaDecimal(h){
   let [h1,m]=h.split(':');
-  return parseInt(h1)+m/60;
+  return parseInt(h1) + parseInt(m)/60;
 }
 
+// ===== ATUALIZAR =====
 function atualizar(){
   let hist = getHistorico();
   let tabela = document.getElementById("historico");
@@ -250,24 +254,63 @@ function atualizar(){
   });
 
   document.getElementById("bancoHoras").innerText=total.toFixed(2);
+
+  // GRAFICO
+  let labels = hist.map(i=>i.data);
+  let dados = hist.map(i=> i.trabalhadas - i.meta);
+
+  if(window.grafico) window.grafico.destroy();
+
+  let ctx = document.getElementById("grafico").getContext("2d");
+
+  window.grafico = new Chart(ctx,{
+    type:"bar",
+    data:{
+      labels: labels,
+      datasets:[{
+        label:"Saldo diário",
+        data: dados
+      }]
+    }
+  });
 }
 
-// ===== REGISTRO =====
+// ===== ENTRADA =====
 function baterEntrada(){
-  let agora=new Date();
-  pontoHoje.entrada=agora.toLocaleTimeString().slice(0,5);
-  pontoHoje.data=agora.toLocaleDateString();
+  if(pontoHoje.entrada){
+    alert("Entrada já registrada!");
+    return;
+  }
+
+  let agora = new Date();
+
+  pontoHoje = {
+    entrada: agora.toLocaleTimeString().slice(0,5),
+    data: agora.toLocaleDateString()
+  };
+
+  localStorage.setItem("pontoTemp", JSON.stringify(pontoHoje));
+
+  document.getElementById("status").innerText =
+    "Entrada registrada às " + pontoHoje.entrada;
 }
 
+// ===== SAIDA =====
 function baterSaida(){
-  let agora=new Date();
-  pontoHoje.saida=agora.toLocaleTimeString().slice(0,5);
+  if(!pontoHoje.entrada){
+    alert("Você precisa bater a entrada primeiro!");
+    return;
+  }
 
-  let trab=horaDecimal(pontoHoje.saida)-horaDecimal(pontoHoje.entrada)-1;
-  let sexta=new Date().getDay()==5;
-  let meta=sexta?8:9;
+  let agora = new Date();
+  pontoHoje.saida = agora.toLocaleTimeString().slice(0,5);
 
-  let hist=getHistorico();
+  let trab = horaDecimal(pontoHoje.saida) - horaDecimal(pontoHoje.entrada) - 1;
+  let sexta = new Date().getDay()==5;
+  let meta = sexta ? 8 : 9;
+
+  let hist = getHistorico();
+
   hist.push({
     data:pontoHoje.data,
     entrada:pontoHoje.entrada,
@@ -278,6 +321,11 @@ function baterSaida(){
 
   salvar(hist);
   atualizar();
+
+  localStorage.removeItem("pontoTemp");
+  pontoHoje = {};
+
+  document.getElementById("status").innerText = "Saída registrada!";
 }
 
 // ===== LIMPAR =====
@@ -288,7 +336,7 @@ function limparMes(){
   }
 }
 
-// ===== DARK MODE =====
+// ===== DARK =====
 function toggleDark(){
   document.body.classList.toggle("dark");
 }
