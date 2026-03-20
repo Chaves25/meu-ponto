@@ -3,16 +3,19 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+
 <title>Meu Ponto</title>
+
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0d6efd">
+<link rel="icon" href="icon-192.png">
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
 body { font-family:'Segoe UI'; margin:0; background:#f4f6f9; }
 .dark { background:#121212; color:#eee; }
-
 .container { max-width:900px; margin:auto; padding:15px; }
-
 h2 { text-align:center; }
 
 button {
@@ -20,7 +23,6 @@ button {
   padding:12px; margin:5px;
   border-radius:10px; cursor:pointer;
 }
-
 button:active { transform:scale(0.95); }
 
 .btn-danger { background:#dc3545; }
@@ -38,7 +40,6 @@ td,th { padding:8px; text-align:center; }
 .extra { color:green; }
 .falta { color:red; }
 
-/* LOGIN */
 .login {
   position:fixed;
   width:100%; height:100%;
@@ -61,10 +62,8 @@ input, select {
 
 <body>
 
-<!-- LOGIN -->
 <div id="loginTela" class="login">
   <div class="login-box">
-
     <h2>🔐 Meu Ponto</h2>
 
     <div id="menuInicial">
@@ -86,7 +85,6 @@ input, select {
       <button onclick="criarUsuario()">Cadastrar</button>
       <button onclick="voltarMenu()">⬅ Voltar</button>
     </div>
-
   </div>
 </div>
 
@@ -96,6 +94,8 @@ input, select {
 
 <div>
 <button onclick="baterEntrada()">Entrada</button>
+<button onclick="baterAlmoco()">Saída Almoço</button>
+<button onclick="voltarAlmoco()">Volta Almoço</button>
 <button onclick="baterSaida()">Saída</button>
 <button class="btn-danger" onclick="limparMes()">Limpar</button>
 <button onclick="toggleDark()">Modo</button>
@@ -119,13 +119,34 @@ Saldo: <span id="bancoHoras"></span>
 
 <script>
 
-// ===== USUÁRIOS =====
+// SERVICE WORKER
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("sw.js");
+}
+
+// USUÁRIOS
 let usuarios = JSON.parse(localStorage.getItem("usuarios")) || {};
 
-// ===== TEMP =====
-let pontoHoje = JSON.parse(localStorage.getItem("pontoTemp")) || {};
+let pontoHoje = JSON.parse(localStorage.getItem("pontoTemp")) || {
+  entrada:null, almocoSaida:null, almocoVolta:null, saida:null, data:null
+};
 
-// ===== MENU =====
+const mesAtual = new Date().getMonth()+1;
+
+// FUNÇÕES BASE
+function getChave(){
+  return "ponto_"+mesAtual+"_"+localStorage.getItem("usuarioLogado");
+}
+
+function getHistorico(){
+  return JSON.parse(localStorage.getItem(getChave()))||[];
+}
+
+function salvar(hist){
+  localStorage.setItem(getChave(), JSON.stringify(hist));
+}
+
+// MENU
 function mostrarLogin(){
   document.getElementById("menuInicial").style.display="none";
   document.getElementById("areaLogin").style.display="block";
@@ -143,21 +164,20 @@ function voltarMenu(){
   document.getElementById("areaCadastro").style.display="none";
 }
 
-// ===== LISTA =====
 function atualizarListaUsuarios(){
   let select = document.getElementById("user");
-  select.innerHTML = '<option value="">Selecione usuário</option>';
+  select.innerHTML='<option value="">Selecione usuário</option>';
   for(let u in usuarios){
-    select.innerHTML += `<option>${u}</option>`;
+    select.innerHTML+=`<option>${u}</option>`;
   }
 }
 
-// ===== LOGIN =====
+// LOGIN
 function entrar(){
   let user = document.getElementById("user").value;
   let pass = document.getElementById("pass").value;
 
-  if(usuarios[user] && usuarios[user] === pass){
+  if(usuarios[user] && usuarios[user]===pass){
     localStorage.setItem("usuarioLogado", user);
     document.getElementById("loginTela").style.display="none";
     iniciarSistema();
@@ -167,42 +187,31 @@ function entrar(){
   }
 }
 
-// ===== CADASTRO =====
 function criarUsuario(){
-  let user = document.getElementById("novoUser").value;
-  let pass = document.getElementById("novaSenha").value;
+  let user=document.getElementById("novoUser").value;
+  let pass=document.getElementById("novaSenha").value;
 
-  if(!user || !pass){
-    alert("Preencha tudo!");
-    return;
-  }
+  if(!user||!pass){ alert("Preencha tudo"); return; }
+  if(usuarios[user]){ alert("Usuário já existe"); return; }
 
-  if(usuarios[user]){
-    alert("Usuário já existe!");
-    return;
-  }
-
-  usuarios[user] = pass;
+  usuarios[user]=pass;
   localStorage.setItem("usuarios", JSON.stringify(usuarios));
-
   alert("Usuário criado!");
   voltarMenu();
 }
 
-// ===== LOGOUT =====
 function logout(){
   localStorage.removeItem("usuarioLogado");
   location.reload();
 }
 
-// ===== INICIAR =====
 function iniciarSistema(){
   let usuario = localStorage.getItem("usuarioLogado");
-  document.getElementById("nomeUsuario").innerText = usuario;
+  document.getElementById("nomeUsuario").innerText=usuario;
 }
 
-// ===== AUTO LOGIN =====
-window.onload = function(){
+// AUTO LOGIN
+window.onload=function(){
   if(localStorage.getItem("usuarioLogado")){
     document.getElementById("loginTela").style.display="none";
     iniciarSistema();
@@ -210,33 +219,26 @@ window.onload = function(){
   }
 }
 
-// ===== PONTO =====
-const mesAtual = new Date().getMonth()+1;
-
-function getChave(){
-  return "ponto_"+mesAtual+"_"+localStorage.getItem("usuarioLogado");
-}
-
-function getHistorico(){
-  return JSON.parse(localStorage.getItem(getChave()))||[];
-}
-
-function salvar(hist){
-  localStorage.setItem(getChave(), JSON.stringify(hist));
-}
-
-// ===== HORA =====
+// HORA
 function horaDecimal(h){
   let [h1,m]=h.split(':');
-  return parseInt(h1) + parseInt(m)/60;
+  return parseInt(h1)+parseInt(m)/60;
 }
 
-// ===== ATUALIZAR =====
+// ATUALIZAR
 function atualizar(){
-  let hist = getHistorico();
-  let tabela = document.getElementById("historico");
+  let hist=getHistorico();
+  let tabela=document.getElementById("historico");
 
-  tabela.innerHTML="<tr><th>Data</th><th>Entrada</th><th>Saída</th><th>Saldo</th></tr>";
+  tabela.innerHTML=`
+<tr>
+<th>Data</th>
+<th>Entrada</th>
+<th>Almoço Saída</th>
+<th>Almoço Volta</th>
+<th>Saída</th>
+<th>Saldo</th>
+</tr>`;
 
   let total=0;
 
@@ -245,90 +247,97 @@ function atualizar(){
     total+=diff;
 
     tabela.innerHTML+=`
-    <tr>
-      <td>${i.data}</td>
-      <td>${i.entrada}</td>
-      <td>${i.saida}</td>
-      <td class="${diff>=0?'extra':'falta'}">${diff.toFixed(2)}</td>
-    </tr>`;
+<tr>
+<td>${i.data}</td>
+<td>${i.entrada}</td>
+<td>${i.almocoSaida||'-'}</td>
+<td>${i.almocoVolta||'-'}</td>
+<td>${i.saida}</td>
+<td class="${diff>=0?'extra':'falta'}">${diff.toFixed(2)}</td>
+</tr>`;
   });
 
   document.getElementById("bancoHoras").innerText=total.toFixed(2);
 
-  // GRAFICO
-  let labels = hist.map(i=>i.data);
-  let dados = hist.map(i=> i.trabalhadas - i.meta);
+  let labels=hist.map(i=>i.data);
+  let dados=hist.map(i=>i.trabalhadas-i.meta);
 
   if(window.grafico) window.grafico.destroy();
 
-  let ctx = document.getElementById("grafico").getContext("2d");
+  let ctx=document.getElementById("grafico").getContext("2d");
 
-  window.grafico = new Chart(ctx,{
+  window.grafico=new Chart(ctx,{
     type:"bar",
-    data:{
-      labels: labels,
-      datasets:[{
-        label:"Saldo diário",
-        data: dados
-      }]
-    }
+    data:{labels,datasets:[{label:"Saldo diário",data:dados}]}
   });
 }
 
-// ===== ENTRADA =====
+// ENTRADA
 function baterEntrada(){
-  if(pontoHoje.entrada){
-    alert("Entrada já registrada!");
-    return;
-  }
+  if(pontoHoje.entrada){ alert("Entrada já registrada"); return; }
 
-  let agora = new Date();
+  let agora=new Date();
 
-  pontoHoje = {
-    entrada: agora.toLocaleTimeString().slice(0,5),
-    data: agora.toLocaleDateString()
+  pontoHoje={
+    entrada:agora.toLocaleTimeString().slice(0,5),
+    data:agora.toLocaleDateString()
   };
 
   localStorage.setItem("pontoTemp", JSON.stringify(pontoHoje));
-
-  document.getElementById("status").innerText =
-    "Entrada registrada às " + pontoHoje.entrada;
+  document.getElementById("status").innerText="Entrada: "+pontoHoje.entrada;
 }
 
-// ===== SAIDA =====
+// ALMOÇO
+function baterAlmoco(){
+  if(!pontoHoje.entrada){ alert("Bata entrada primeiro"); return; }
+  if(pontoHoje.almocoSaida){ alert("Já saiu almoço"); return; }
+
+  pontoHoje.almocoSaida=new Date().toLocaleTimeString().slice(0,5);
+  localStorage.setItem("pontoTemp", JSON.stringify(pontoHoje));
+
+  document.getElementById("status").innerText="Saída almoço: "+pontoHoje.almocoSaida;
+}
+
+function voltarAlmoco(){
+  if(!pontoHoje.almocoSaida){ alert("Não saiu almoço"); return; }
+  if(pontoHoje.almocoVolta){ alert("Já voltou almoço"); return; }
+
+  pontoHoje.almocoVolta=new Date().toLocaleTimeString().slice(0,5);
+  localStorage.setItem("pontoTemp", JSON.stringify(pontoHoje));
+
+  document.getElementById("status").innerText="Volta almoço: "+pontoHoje.almocoVolta;
+}
+
+// SAIDA
 function baterSaida(){
-  if(!pontoHoje.entrada){
-    alert("Você precisa bater a entrada primeiro!");
-    return;
+  if(!pontoHoje.entrada){ alert("Sem entrada"); return; }
+
+  pontoHoje.saida=new Date().toLocaleTimeString().slice(0,5);
+
+  let total=horaDecimal(pontoHoje.saida)-horaDecimal(pontoHoje.entrada);
+
+  if(pontoHoje.almocoSaida && pontoHoje.almocoVolta){
+    total-=horaDecimal(pontoHoje.almocoVolta)-horaDecimal(pontoHoje.almocoSaida);
+  } else {
+    total-=1;
   }
 
-  let agora = new Date();
-  pontoHoje.saida = agora.toLocaleTimeString().slice(0,5);
+  let meta=(new Date().getDay()==5)?8:9;
 
-  let trab = horaDecimal(pontoHoje.saida) - horaDecimal(pontoHoje.entrada) - 1;
-  let sexta = new Date().getDay()==5;
-  let meta = sexta ? 8 : 9;
+  let hist=getHistorico();
 
-  let hist = getHistorico();
-
-  hist.push({
-    data:pontoHoje.data,
-    entrada:pontoHoje.entrada,
-    saida:pontoHoje.saida,
-    trabalhadas:trab,
-    meta:meta
-  });
+  hist.push({...pontoHoje,trabalhadas:total,meta});
 
   salvar(hist);
   atualizar();
 
   localStorage.removeItem("pontoTemp");
-  pontoHoje = {};
+  pontoHoje={};
 
-  document.getElementById("status").innerText = "Saída registrada!";
+  document.getElementById("status").innerText="Saída registrada!";
 }
 
-// ===== LIMPAR =====
+// OUTROS
 function limparMes(){
   if(confirm("Limpar tudo?")){
     localStorage.removeItem(getChave());
@@ -336,12 +345,10 @@ function limparMes(){
   }
 }
 
-// ===== DARK =====
 function toggleDark(){
   document.body.classList.toggle("dark");
 }
 
-// ===== EXPORTAR =====
 function exportar(){
   let hist=getHistorico();
   let csv="Data,Entrada,Saida\n";
